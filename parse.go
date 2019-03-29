@@ -64,7 +64,7 @@ func parsing(url, selectors, attr string, num int) (string, error) {
 	return result[num], nil
 }
 
-func getIni(filename string) (file, url, selectors, attr string, 
+func getIni(filename string) (file, url, selectors, attr string,
 							  number int, head, text string, err error) {
 	cfg, err := ini.Load(filename)
     if err != nil {
@@ -73,6 +73,7 @@ func getIni(filename string) (file, url, selectors, attr string,
 	file = cfg.Section("main").Key("file").String()
 	url = cfg.Section("main").Key("url").String()
 	selectors = cfg.Section("main").Key("selectors").String()
+	selectors = strings.ReplaceAll(selectors, "№", "#")
 	attr = cfg.Section("main").Key("attr").String()
 	number, err = cfg.Section("main").Key("number").Int()
 	if err != nil {
