@@ -6,9 +6,11 @@ import (
 	"io/ioutil"
 	"time"
 	"strings"
+	"sync"
 	"github.com/go-ini/ini"
 	"github.com/PuerkitoBio/goquery"
 	"mylibs/slkclient"
+
 )
 
 type iniParam struct {
@@ -108,31 +110,35 @@ func getOldText(filename string) (result string, err error) {
 	return
 }
 
-func main() {
-	filenames, err := ioutil.ReadDir(".")
-	if err == nil {
-		var (
-			ip iniParam
-			newtext, oldtext string
-			err error
-		)
-		for _, filename := range filenames {
-			if strings.HasSuffix(filename.Name(), ".ini") {
-				ip, err = getIni(filename.Name())
-				if err != nil {
-					continue
-				}
-				newtext, err = parsing(ip)
-				if err != nil {
-					continue
-				}
-				oldtext, _ = getOldText(ip.file)
-				if newtext != oldtext {
-					slkclient.SendToSlack(ip.head, fmt.Sprintf(ip.text, newtext), "", "", "")
-					ioutil.WriteFile(ip.file, []byte(newtext), 0666)
-				}
-			}
+func worker(ip iniParam, ws *sync.WaitGroup) {
+	defer ws.Done()
+	newtext, err := parsing(ip)
+	if err != nil {
+		return
+	}
+	oldtext, _ := getOldText(ip.file)
+	if newtext != oldtext {
+		slkclient.SendToSlack(ip.head, fmt.Sprintf(ip.text, newtext), "", "", "")
+		ioutil.WriteFile(ip.file, []byte(newtext), 0666)
 	}
 }
+
+func main() {
+	ws := &sync.WaitGroup{}
+	filenames, err := ioutil.ReadDir(".")
+	if err == nil {
+		for _, filename := range filenames {
+			if strings.HasSuffix(filename.Name(), ".ini") {
+				ip, err := getIni(filename.Name())
+				if err != nil {
+					continue
+				}
+				ws.Add(1)
+				go worker(ip, ws)
+			}
+		}
+		ws.Wait()
+	}
 }
+
 // go build -ldflags "-H windowsgui" <file.go>
