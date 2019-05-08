@@ -2,15 +2,14 @@ package main
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/go-ini/ini"
+	"github.com/igiant/go-libs/slkclient"
 	"io/ioutil"
-	"time"
+	"net/http"
 	"strings"
 	"sync"
-	"github.com/go-ini/ini"
-	"github.com/PuerkitoBio/goquery"
-	"mylibs/slkclient"
-
+	"time"
 )
 
 type iniParam struct {
@@ -30,7 +29,7 @@ func parsing(ip iniParam) (string, error) {
 
 	req, err := http.NewRequest("GET", ip.url, nil)
 	if err != nil {
-		return "", fmt.Errorf("Error reading request: %v", err)
+		return "", fmt.Errorf("error reading request: %v", err)
 	}
 	req.Header.Set("User-Agent", ua)
 
@@ -38,10 +37,10 @@ func parsing(ip iniParam) (string, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Error reading response: %v", err)
+		return "", fmt.Errorf("error reading response: %v", err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {_ = resp.Body.Close()}()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("status code error: %d", resp.StatusCode)
@@ -49,7 +48,7 @@ func parsing(ip iniParam) (string, error) {
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("Error reading body: %v", err)
+		return "", fmt.Errorf("error reading body: %v", err)
 	}
 	doc.Find(ip.selectors).Each(func(i int, s *goquery.Selection) {
 		// For each item found, get the band and title
@@ -62,7 +61,7 @@ func parsing(ip iniParam) (string, error) {
 
 	})
 	if len(result) == 0 {
-		return "", fmt.Errorf("No items found")
+		return "", fmt.Errorf("no items found")
 	}
 	if ip.number < 0 {
 		ip.number = len(result) + ip.number
@@ -118,8 +117,8 @@ func worker(ip iniParam, ws *sync.WaitGroup) {
 	}
 	oldtext, _ := getOldText(ip.file)
 	if newtext != oldtext {
-		slkclient.SendToSlack(ip.head, fmt.Sprintf(ip.text, newtext), "", "", "")
-		ioutil.WriteFile(ip.file, []byte(newtext), 0666)
+		_ = slkclient.SendToSlack(ip.head, fmt.Sprintf(ip.text, newtext), "", "", "")
+		_ = ioutil.WriteFile(ip.file, []byte(newtext), 0666)
 	}
 }
 
